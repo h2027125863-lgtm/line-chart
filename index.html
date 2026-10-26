@@ -1,0 +1,487 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+}
+
+body { overflow: hidden; }
+
+.wrap {
+  position: relative;
+  width: 100%;
+  max-width: 1160px;
+  margin: auto;
+  aspect-ratio: 1160 / 670;
+  background: transparent;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.map path {
+  fill: none;
+  stroke: #8ba6b5;
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .22;
+}
+
+.map .island { opacity: .28; }
+
+.grid line {
+  stroke: #95a4ae;
+  stroke-width: 1;
+  stroke-dasharray: 3 8;
+  opacity: .16;
+}
+
+.axis text {
+  font-size: 15px;
+  fill: #a9bbc4;
+}
+
+.trend {
+  fill: none;
+  stroke: #d9894e;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px rgba(219,128,65,.26));
+}
+
+.dot {
+  fill: #e7a16a;
+  stroke: #ffe0c5;
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.focus-ring {
+  fill: none;
+  stroke: #e9a26a;
+  stroke-width: 2;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.marker.active .focus-ring { opacity: 1; }
+
+.controls {
+  position: absolute;
+  top: 2.5%;
+  right: 3%;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.controls button {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 12px;
+  border: 1px solid rgba(150,170,180,.35);
+  border-radius: 3px;
+  color: #9eb3bf;
+  background: rgba(30,48,59,.20);
+  cursor: pointer;
+}
+
+.controls button[aria-pressed="true"] {
+  color: #f1c09c;
+  border-color: #c88959;
+  background: rgba(144,86,46,.14);
+}
+
+.tip {
+  position: absolute;
+  z-index: 3;
+  min-width: 126px;
+  padding: 10px 13px;
+  border: 1px solid rgba(215,145,90,.62);
+  border-radius: 4px;
+  background: rgba(22,37,48,.94);
+  color: #e9eff3;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%,-110%);
+  transition: opacity .15s;
+}
+
+.tip.show { opacity: 1; }
+
+.tip .year {
+  font-size: 12px;
+  color: #c6d4db;
+}
+
+.tip .value {
+  font-size: 22px;
+  font-weight: 650;
+  color: #efae7b;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.note {
+  position: absolute;
+  bottom: 2.2%;
+  left: 6%;
+  font-size: 12px;
+  color: #8fa2ac;
+  opacity: .7;
+  pointer-events: none;
+}
+
+@media (max-width:600px) {
+  .wrap { aspect-ratio: 1160 / 780; }
+  .controls {
+    top: 1%;
+    left: 5%;
+    right: 5%;
+    justify-content: center;
+  }
+  .controls button {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="wrap" id="wrap">
+
+  <div class="controls">
+    <button data-key="fires" aria-pressed="true">接报火灾数</button>
+    <button data-key="deaths" aria-pressed="false">死亡人数</button>
+    <button data-key="injuries" aria-pressed="false">受伤人数</button>
+    <button data-key="loss" aria-pressed="false">直接财产损失</button>
+  </div>
+
+  <svg class="chart" id="chart"
+       viewBox="0 0 1160 670"
+       role="img"
+       aria-label="2016至2025年全国火灾数据动态折线图">
+
+    <defs>
+      <clipPath id="plotClip">
+        <rect x="90" y="110" width="980" height="430"/>
+      </clipPath>
+    </defs>
+
+    <!-- 中国地图简化示意轮廓，包含台湾、海南 -->
+    <g class="map" transform="translate(292 122) scale(1.18)">
+      <path d="M80 120 L55 105 35 81 52 61 91 53
+      112 31 153 43 177 22 220 29 248 6
+      281 23 319 19 342 41 385 29 416 52
+      459 48 488 67 532 62 556 88 590 99
+      606 124 594 151 620 170 614 201
+      580 211 569 239 546 252 528 286
+      502 304 492 334 466 353 447 381
+      422 389 403 367 378 361 363 338
+      331 339 306 319 283 331 259 314
+      242 291 221 294 204 269 180 279
+      154 266 141 245 119 235 103 206
+      85 196 73 171 53 154 71 137 Z"/>
+
+      <path class="island"
+        d="M499 361 Q520 376 508 401
+           Q498 415 489 399 Q487 377 499 361 Z"/>
+
+      <path class="island"
+        d="M551 335 Q565 353 557 379
+           Q548 394 542 380 Q537 358 551 335 Z"/>
+    </g>
+
+    <g id="grid" class="grid"></g>
+    <g id="axis" class="axis"></g>
+
+    <g clip-path="url(#plotClip)">
+      <path id="line" class="trend"/>
+      <g id="markers"></g>
+    </g>
+
+  </svg>
+
+  <div id="tip" class="tip">
+    <div class="year" id="tipYear"></div>
+    <div class="value" id="tipValue"></div>
+  </div>
+
+  <div class="note" id="note">
+    单位：万起 · 地图为淡化的示意轮廓
+  </div>
+
+</div>
+
+<script>
+const years = [
+  2016, 2017, 2018, 2019, 2020,
+  2021, 2022, 2023, 2024, 2025
+];
+
+const series = {
+  fires: {
+    values: [31.2,28.1,23.7,23.3,25.2,74.8,82.5,87.8,90.8,84.1],
+    unit: "万起",
+    precision: 1
+  },
+  deaths: {
+    values: [1582,1390,1407,1335,1183,1987,2053,1796,2001,1827],
+    unit: "人",
+    precision: 0
+  },
+  injuries: {
+    values: [1065,881,798,837,775,2225,2122,2540,2665,2161],
+    unit: "人",
+    precision: 0
+  },
+  loss: {
+    values: [37.2,36,36.75,36.12,40.09,67.5,71.6,76.2,77.4,85.3],
+    unit: "亿元",
+    precision: 2
+  }
+};
+
+const ns = "http://www.w3.org/2000/svg";
+const line = document.getElementById("line");
+const markers = document.getElementById("markers");
+const axis = document.getElementById("axis");
+const grid = document.getElementById("grid");
+const wrap = document.getElementById("wrap");
+const tip = document.getElementById("tip");
+
+let active = "fires";
+let selected = -1;
+let timers = [];
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(ns, tag);
+  for (const [k,v] of Object.entries(attrs)) {
+    e.setAttribute(k,v);
+  }
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function niceMax(n) {
+  const step = Math.pow(10,Math.floor(Math.log10(n)));
+  const scaled = n / step;
+  return (scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10) * step;
+}
+
+function positionTip(i,pt) {
+  const rect = wrap.getBoundingClientRect();
+  const px = pt.x / 1160 * rect.width;
+  const py = pt.y / 670 * rect.height;
+
+  tip.style.left =
+    Math.min(Math.max(px,72),rect.width-72) + "px";
+  tip.style.top = Math.max(py-12,65) + "px";
+
+  document.getElementById("tipYear").textContent =
+    years[i] + "年";
+
+  const s = series[active];
+
+  document.getElementById("tipValue").textContent =
+    s.values[i].toLocaleString("zh-CN",{
+      maximumFractionDigits:s.precision
+    }) + " " + s.unit;
+
+  tip.classList.add("show");
+}
+
+function hideTip() {
+  selected = -1;
+  tip.classList.remove("show");
+  markers.querySelectorAll(".marker").forEach(e => {
+    e.classList.remove("active");
+  });
+}
+
+function draw(key) {
+  timers.forEach(clearTimeout);
+  timers = [];
+
+  active = key;
+  hideTip();
+  markers.replaceChildren();
+  axis.replaceChildren();
+  grid.replaceChildren();
+
+  const s = series[key];
+  const max = niceMax(Math.max(...s.values)*1.04);
+  const left = 110;
+  const right = 1035;
+  const top = 138;
+  const bottom = 535;
+
+  const pts = s.values.map((v,i) => ({
+    x: left + i*(right-left)/9,
+    y: bottom - v/max*(bottom-top)
+  }));
+
+  // 绘制横向网格与纵轴
+  for (let i=0;i<=4;i++) {
+    const val = max*i/4;
+    const y = bottom-(bottom-top)*i/4;
+
+    el("line",{
+      x1:left,y1:y,x2:right,y2:y
+    },grid);
+
+    const t = el("text",{
+      x:95,y:y+5,"text-anchor":"end"
+    },axis);
+
+    t.textContent = Number.isInteger(val)
+      ? val.toLocaleString("zh-CN")
+      : val.toFixed(1);
+  }
+
+  // 年份坐标
+  years.forEach((year,i) => {
+    const t = el("text",{
+      x:pts[i].x,
+      y:567,
+      "text-anchor":"middle"
+    },axis);
+    t.textContent = year;
+  });
+
+  // 折线
+  const d = pts.map((p,i) =>
+    (i ? "L" : "M") +
+    p.x.toFixed(1) + " " +
+    p.y.toFixed(1)
+  ).join(" ");
+
+  line.setAttribute("d",d);
+  line.style.transition = "none";
+  line.style.strokeDasharray = "none";
+
+  const len = line.getTotalLength();
+
+  line.style.strokeDasharray = len + " " + len;
+  line.style.strokeDashoffset = len;
+
+  line.getBoundingClientRect();
+
+  line.style.transition =
+    "stroke-dashoffset 2.35s cubic-bezier(.18,.55,.3,1)";
+  line.style.strokeDashoffset = "0";
+
+  // 依次显示数据点
+  pts.forEach((p,i) => {
+    const g = el("g",{
+      class:"marker",
+      tabindex:"0",
+      role:"button",
+      "aria-label":
+        `${years[i]}年：${s.values[i]}${s.unit}`,
+      style:"opacity:0;transition:opacity .25s"
+    },markers);
+
+    el("circle",{
+      class:"focus-ring",
+      cx:p.x,cy:p.y,r:13
+    },g);
+
+    el("circle",{
+      class:"dot",
+      cx:p.x,cy:p.y,r:5.8
+    },g);
+
+    el("circle",{
+      class:"hit",
+      cx:p.x,cy:p.y,r:24
+    },g);
+
+    const show = () => {
+      selected = i;
+
+      markers.querySelectorAll(".marker").forEach(e => {
+        e.classList.remove("active");
+      });
+
+      g.classList.add("active");
+      positionTip(i,p);
+    };
+
+    g.addEventListener("pointerenter",show);
+    g.addEventListener("pointerdown",show);
+    g.addEventListener("focus",show);
+
+    g.addEventListener("keydown",e => {
+      if (e.key==="Enter" || e.key===" ") {
+        e.preventDefault();
+        show();
+      }
+    });
+
+    timers.push(setTimeout(() => {
+      g.style.opacity = "1";
+    },250+i*225));
+  });
+
+  document.getElementById("note").textContent =
+    "单位：" + s.unit + " · 地图为淡化的示意轮廓";
+
+  document.querySelectorAll(".controls button")
+    .forEach(b => {
+      b.setAttribute(
+        "aria-pressed",
+        String(b.dataset.key===key)
+      );
+    });
+}
+
+markers.addEventListener("pointerleave",e => {
+  if (e.pointerType==="mouse") hideTip();
+});
+
+document.querySelectorAll(".controls button")
+  .forEach(b => {
+    b.addEventListener("click",() => draw(b.dataset.key));
+  });
+
+window.addEventListener("resize",() => {
+  if (selected >= 0) {
+    const g = markers.children[selected];
+    const c = g.querySelector(".dot");
+
+    positionTip(selected,{
+      x:+c.getAttribute("cx"),
+      y:+c.getAttribute("cy")
+    });
+  }
+});
+
+draw("fires");
+</script>
+</body>
+</html>
